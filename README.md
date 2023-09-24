@@ -1,2 +1,2 @@
 # MarlinGCodeSender
-GCode sensder for marlin based CNC
+GCode sender for marlin based CNC
