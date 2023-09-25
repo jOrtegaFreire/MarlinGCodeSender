@@ -1,0 +1,8 @@
+
+env/
+tests.py
+test_file.gcode
+output_mesh.obj
+output_file.gcode
+__pycache__
+misc.py
