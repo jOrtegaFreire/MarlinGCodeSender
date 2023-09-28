@@ -1,4 +1,4 @@
-from tkinter import Tk, Toplevel,Frame,ttk,Text,DISABLED,Entry,NORMAL
+from tkinter import Tk, Toplevel,Frame,ttk,Text,DISABLED,Entry,NORMAL,Button
 import serial.tools.list_ports
 from os import system, path, remove
 from pathlib import Path
@@ -12,7 +12,8 @@ import json
 # import numpy as np
 
 from widgets import CustomMenuBar,CustomMenu
-from widgets import Plotter_Frame,DRO_Frame,Serial_Console_Frame
+from widgets import Plotter_Frame,DRO_Frame,Serial_Console_Frame,Warning_Frame,Manual_Control_Frame
+from widgets import Status_Bar
 from serial_connection import serial_port
 
 class RootWindow(Tk):
@@ -40,15 +41,17 @@ class MainWindow(Toplevel):
         super().__init__(parent)
         self.parent=parent
         self.title(title)
-        self.width=1280
-        self.height=720
-        self.geometry("{}x{}+{}+{}".format(self.width,self.height,int((self.winfo_screenwidth()-self.width)/2),int((self.winfo_screenheight()-self.height)/2)))
+        self.width=self.winfo_screenwidth()
+        self.height=self.winfo_screenheight()
+        self.geometry("{}x{}+{}+{}".format(self.width,self.height,0,0))
         self.resizable(False,False)
         self.menubar_bg="#2b2b2b"
         self.sidebars_bg="#303030"
         self.window_bg="#1b1b1b"
         self.file_item_bg="#404040"
         self.configure(background=self.window_bg)
+
+        self.maximized=False
 
         self.connection=serial_port()
 
@@ -61,9 +64,8 @@ class MainWindow(Toplevel):
         self.file_options_menu=None
 
         #load settings
-        # with open("settings.json","r") as f:
-        #     self.settings=json.load(f)
-
+        with open("settings.json","r") as f:
+            self.settings=json.load(f)
 
         #menubar
         self.menubar=CustomMenuBar(self,self.width,30,self.menubar_bg)
@@ -89,9 +91,12 @@ class MainWindow(Toplevel):
         self.menubar.add_menu(label="Tools",menu=self.tools_menu)
 
         # status bar
-        self.status_bar=Frame(self)
-        self.status_bar.configure(width=self.width-10,height=30)
+        self.status_bar=Status_Bar(self,width=self.width-10,height=30)
         self.status_bar.place(x=5,y=self.height-35)
+        self.status_bar.set_text('Disconnected')
+        # self.status_bar=Frame(self)
+        # self.status_bar.configure(width=self.width-10,height=30)
+        # self.status_bar.place(x=5,y=self.height-35)
 
         # home frame
         # port + baudrate +connect/disconnect buttons at the top
@@ -100,7 +105,9 @@ class MainWindow(Toplevel):
         
         
         self.home_frame=Frame(self)
-        self.home_frame.configure(width=self.width-10,height=self.height-75)
+        self.home_frame_w=self.width-10
+        self.home_frame_h=self.height-75
+        self.home_frame.configure(width=self.home_frame_w,height=self.home_frame_h)
         self.home_frame.place(x=5,y=35)
 
         # port selecttion
@@ -121,29 +128,49 @@ class MainWindow(Toplevel):
         self.connect_btn.place(x=30+self.baud_dropdown.winfo_reqwidth()+self.port_dropdown.winfo_reqwidth(),y=10)
 
         # serial console
-        self.serial_console=Serial_Console_Frame(self.home_frame,self.connection,width=380,height=284)
+        self.serial_console=Serial_Console_Frame(self.home_frame,self.connection,width=(self.home_frame_w-40)//3,height=(self.home_frame_h-40)//2)
         self.serial_console.place(x=10,y=40)
 
         # Graphic representation
-        self.plotter_frame=Plotter_Frame(self.home_frame,width=380,height=284)
+        self.plotter_frame=Plotter_Frame(self.home_frame,width=(self.home_frame_w-40)//3,height=(self.home_frame_h-40)//2)
         self.plotter_frame.place(x=20+self.serial_console.winfo_reqwidth(),y=40)
 
         # "DRO" and homming
-        self.dro_frame=DRO_Frame(self.home_frame,width=450,height=284)
+        self.dro_frame=DRO_Frame(self.home_frame,width=(self.home_frame_w-40)//3,height=(self.home_frame_h-40)//2)
         self.dro_frame.place(x=30+self.serial_console.winfo_reqwidth()+self.plotter_frame.winfo_reqwidth(),y=40)
+        self.dro_frame.set_process_command_funtion(self.serial_console.send_command)
 
-        self.dro_frame.set_process_command_funtion(self.serial_console.process_command)
+        # # self.test_warning=Warning_Frame(self.home_frame,warning_message="This is a warning",width=500,height=200)
+        # # self.test_warning.place(x=(self.width-500)//2,y=(self.height-200)//2)
+
+
+        self.manual_control=Manual_Control_Frame(self.home_frame,width=260,height=235)
+        self.manual_control.place(x=self.home_frame_w-270,y=50+((self.home_frame_h-40)//2))
+        self.manual_control.set_command_handler(self.serial_console.send_command)
+
         self.bind('<Control-d>',self.quit)
+
+        self.update_frames()
+
+    def update_frames(self):
+        if self.connection.is_connected():
+            self.dro_frame.update_frame(self.serial_console.get_machine_pos())
+        self.after(1000,self.update_frames)
+
 
     def connect(self):
         if not self.connection.is_connected():
             self.connection.config(port=self.port_dropdown.get(),baudrate=self.baud_dropdown.get())
             self.connection.connect()
-            self.serial_console.read_from_serial()
+            self.serial_console.connect()
+            # self.serial_console.update_console()
+            self.status_bar.set_text(f'Connected: {self.port_dropdown.get()}, {self.baud_dropdown.get()}')
             self.connect_btn.config(text="Disconnect")
         else:
             self.connection.disconnect()
+            self.status_bar.set_text('Disconnected')
             self.connect_btn.config(text="Connect")
+            self.serial_console.write_to_console('DISCONNECTED')
  
     # def load_graphics(self):
     #     # Create a PyVista QtInteractor
@@ -192,10 +219,6 @@ class MainWindow(Toplevel):
         
     #     # self.file_panel.add_files(self.vault)
     #     # self.bind_files()
-
-
-
-
 
     def move_window(self,x,y):
         self.geometry("{}x{}+{}+{}".format(self.width,self.height,x,y))

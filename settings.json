@@ -1,0 +1,16 @@
+[
+    {
+    "profile":"Marlin CNC",
+    "DEFAULT":1,
+    "UNITS":"mm",
+    "X_MAX":300,
+    "Y_MAX":200,
+    "Z_MAX":70,
+    "X_FEEDRATE":750,
+    "Y_FEEDRATE":750,
+    "Z_FEEDRATE":300,
+    "X_TRAVEL":750,
+    "Y_TRAVEL":750,
+    "Z_TRAVEL":300
+    }
+]

@@ -1,0 +1,12 @@
+
+LINEAR_MOVE_0       = 'G0'
+LINEAR_MOVE_1       = 'G1'
+HOME_X              = 'G28 X'
+HOME_Y              = 'G28 Y'
+HOME_Z              = 'G28 Z'
+ABSOLUTE_MODE       = 'G90'
+RELATIVE_MODE       = 'G91'
+SET_X_0             = 'G92 X0'
+SET_Y_0             = 'G92 Y0'
+SET_Z_0             = 'G92 Z0'
+GET_CURRENT_POS     = 'M114'

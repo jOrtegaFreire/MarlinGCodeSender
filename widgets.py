@@ -1,10 +1,13 @@
-from tkinter import Button,Entry,Text,Frame,Label,Toplevel
+from tkinter import Button,Entry,Text,Frame,Label,Toplevel,ttk
 from tkinter import END, W,DISABLED,NORMAL
 from PIL.ImageTk import PhotoImage
+from time import time
 from PIL import Image
 import json
 
 from serial_connection import serial_port
+import GCODE
+
 # from pyvistaqt import QtInteractor
 
 class CustomMenuBar(Frame):
@@ -31,6 +34,13 @@ class CustomMenuBar(Frame):
 
         self.bind('<Button-1>',self.set_init_pos)
         # self.bind('<B1-Motion>',self.move_window)
+
+    def update_resolution(self,width):
+        self.width=width
+        self.configure(width=self.width)
+        self.minimizeBtn.place(x=self.width-90,y=0)
+        self.maximizeBtn.place(x=self.width-60,y=0)
+        self.closeBtn.place(x=self.width-30,y=0)
 
     def set_init_pos(self,event):
         start_x, start_y = event.widget.winfo_pointerxy()
@@ -264,7 +274,7 @@ class ReadOnlyEntry(Entry):
 
     def __init__(self,container,**kwargs):
         super().__init__(container,kwargs)
-        self.config(state=DISABLED)
+        self.config(state=DISABLED,bg=kwargs.get('bg'))
 
     def write(self,text):
         self.config(state=NORMAL)
@@ -272,54 +282,83 @@ class ReadOnlyEntry(Entry):
         self.insert('end',text)
         self.config(state=DISABLED)
 
+class ReadOnlyText(Text):
+
+    def __init__(self,container,**kwargs):
+        super().__init__(container,kwargs)
+        self.config(state=DISABLED)
+
+    def write(self,text,end='\n'):
+        self.config(state=NORMAL)
+        self.insert('end',text+end)
+        self.yview_moveto(1.0)
+        self.config(state=DISABLED)
+
+    def clear(self):
+        self.config(state=NORMAL)
+        self.delete(0.0,'end')
+        self.config(state=DISABLED)
+        self.yview_moveto(1.0)
+
+
 class DRO_Frame(Frame):
 
     def __init__(self,container,**kwargs):
         super().__init__(container,kwargs)
         self.container=container
         self.bg="#505050"
+        self.width=kwargs.get('width')
+        self.height=kwargs.get('height')
 
         # process command function
         self.process_command=None
 
         self.xpos_entry=ReadOnlyEntry(self,font=("Arial",32),width=9,justify='right')
-        self.xpos_entry.write('0.0000')
-        self.xpos_entry.place(x=150,y=10)
+        self.xpos_entry.write('+300.0000')
+        self.xpos_entry.place(x=121,y=0)
 
         self.ypos_entry=ReadOnlyEntry(self,font=("Arial",32),width=9,justify='right')
         self.ypos_entry.write('0.0000')
-        self.ypos_entry.place(x=150,y=20+self.xpos_entry.winfo_reqheight())
+        self.ypos_entry.place(x=121,y=10+self.xpos_entry.winfo_reqheight())
 
         self.zpos_entry=ReadOnlyEntry(self,font=("Arial",32),width=9,justify='right')
         self.zpos_entry.write('0.0000')
-        self.zpos_entry.place(x=150,y=30+self.xpos_entry.winfo_reqheight()+self.ypos_entry.winfo_reqheight())
+        self.zpos_entry.place(x=121,y=20+self.xpos_entry.winfo_reqheight()+self.ypos_entry.winfo_reqheight())
 
         self.home_icon=PhotoImage(Image.open("images/home_icon.png"))
         self.home_x_btn=Button(self,image=self.home_icon,bg=self.bg,activebackground=self.bg,
-                                bd=0,command=lambda command='G28 X' : self.process_command(command))
-        self.home_x_btn.place(x=160+self.xpos_entry.winfo_reqwidth(),y=10)
+                                bd=0,command=lambda command=GCODE.HOME_X: self.process_command(command))
+        self.home_x_btn.place(x=131+self.xpos_entry.winfo_reqwidth(),y=0)
 
         self.home_y_btn=Button(self,image=self.home_icon,bg=self.bg,activebackground=self.bg,
-                                bd=0,command=lambda command='G28 Y': self.process_command(command))
-        self.home_y_btn.place(x=160+self.xpos_entry.winfo_reqwidth(),y=20+self.xpos_entry.winfo_reqheight())
+                                bd=0,command=lambda command=GCODE.HOME_Y: self.process_command(command))
+        self.home_y_btn.place(x=131+self.xpos_entry.winfo_reqwidth(),y=10+self.xpos_entry.winfo_reqheight())
 
         self.home_z_btn=Button(self,image=self.home_icon,bg=self.bg,activebackground=self.bg,
-                                bd=0,command=lambda command='G28 Z': self.process_command(command))
-        self.home_z_btn.place(x=160+self.xpos_entry.winfo_reqwidth(),y=30+self.xpos_entry.winfo_reqheight()+self.ypos_entry.winfo_reqheight())
+                                bd=0,command=lambda command=GCODE.HOME_Z: self.process_command(command))
+        self.home_z_btn.place(x=131+self.xpos_entry.winfo_reqwidth(),y=20+self.xpos_entry.winfo_reqheight()+self.ypos_entry.winfo_reqheight())
 
-        self.zero_x_btn=Button(self,text='Zero\nX',font=("Arial",16),command=lambda command='G92 X0':self.process_command(command))
-        self.zero_x_btn.place(x=90,y=10,width=51,height=51)
+        # zero axis btns
+        self.zero_x_btn=Button(self,text='Zero\nX',font=("Arial",16),command=lambda command=GCODE.SET_X_0:self.process_command(command))
+        self.zero_x_btn.place(x=61,y=0,width=51,height=51)
 
-        self.zero_y_btn=Button(self,text='Zero\nY',font=("Arial",16),command=lambda command='G92 Y0':self.process_command(command))
-        self.zero_y_btn.place(x=90,y=20+self.xpos_entry.winfo_reqheight(),width=51,height=51)
+        self.zero_y_btn=Button(self,text='Zero\nY',font=("Arial",16),command=lambda command=GCODE.SET_Y_0:self.process_command(command))
+        self.zero_y_btn.place(x=61,y=10+self.xpos_entry.winfo_reqheight(),width=51,height=51)
 
-        self.zero_z_btn=Button(self,text='Zero\nZ',font=("Arial",16),command=lambda command='G92 Z0':self.process_command(command))
-        self.zero_z_btn.place(x=90,y=30+self.xpos_entry.winfo_reqheight()+self.ypos_entry.winfo_reqheight(),width=51,height=51)
+        self.zero_z_btn=Button(self,text='Zero\nZ',font=("Arial",16),command=lambda command=GCODE.SET_Z_0:self.process_command(command))
+        self.zero_z_btn.place(x=61,y=20+self.xpos_entry.winfo_reqheight()+self.ypos_entry.winfo_reqheight(),width=51,height=51)
+
+        self.zero_all_btn=Button(self,text='Z\ne\nr\no\n\nA\nl\nl',font=("Arial",14))
+        self.zero_all_btn.place(x=0,y=0,width=51,height=177)
 
 
     def set_process_command_funtion(self,process_command_function):
         self.process_command=process_command_function
 
+    def update_frame(self,machine_pos:tuple):
+        self.xpos_entry.write(f'{machine_pos[0]:.4f}')
+        self.ypos_entry.write(f'{machine_pos[1]:.4f}')
+        self.zpos_entry.write(f'{machine_pos[2]:.4f}')
 
 
 class Serial_Console_Frame(Frame):
@@ -328,50 +367,211 @@ class Serial_Console_Frame(Frame):
         super().__init__(container,kwargs)
         self.container=container
         self.connection=connection
+        self.width=kwargs.get('width')
+        self.height=kwargs.get('height')
 
-        self.console_log=Text(self,width=47,height=16)
-        self.console_log.config(state=DISABLED)
-        self.console_log.place(x=0,y=0)
-        self.console_cmd=Entry(self,width=63)
-        self.console_cmd.place(x=0,y=5+self.console_log.winfo_reqheight())
+        # active flag
+        self.active=True
+
+        # ABSOLUTE/RELATIVE FLAG
+        self.absolute=True
+
+        # MACHINE AXIS INFO
+        self.x_pos=0
+        self.y_pos=0
+        self.z_pos=0
+
+        # self.console_log=Text(self,width=47,height=16)
+        self.console_log=ReadOnlyText(self,width=47,height=16)
+        self.console_log.place(x=0,y=0,width=self.width,height=self.height-30)
+        self.console_cmd=Entry(self,width=50)
+        self.console_cmd.place(x=0,y=self.height-25,width=self.width-60,height=25)
+        self.clear_console_btn=Button(self,text="Clear",command=self.clear_console)
+        self.clear_console_btn.place(x=self.width-50,y=self.height-25,width=50,height=25)
 
         self.console_cmd.bind('<Return>',self.send_command_from_console)
+
+        # self.update()
+
+    def connect(self):
+        self.console_log.write('CONNECTING',end='')
+        self.wait_connect(True)
+
+    def wait_connect(self,condition:bool):
+        if condition:
+            self.console_log.write('.',end='')
+            line=self.connection.readline()
+            self.after(200,self.wait_connect,line=='')
+        else:
+            self.console_log.write('\nCONNECTED')
+            self.after(200,self.get_machine_grettings)
+
+    def get_machine_grettings(self):
+        while True:
+            data=self.connection.readline()
+            if data=='':break
+            self.console_log.write(data)
+        self.console_log.write('READY')
 
     def send_command_from_console(self,event):
         text=self.console_cmd.get()
         self.console_cmd.delete(0,'end')
-        self.console_log.config(state=NORMAL)
-        self.console_log.insert('end','[HOST]: '+text+'\n')
-        self.console_log.config(state=DISABLED)
-        self.console_log.yview_moveto(1.0)
+        self.console_log.write('[HOST]:'+text)
         if self.connection.write(text):
-            self.read_from_serial()
+            self.update_machine_position(text)
+            self.wait_response(True,'',False)
         else:self.write_to_console('Connection error')
-    
-    def send_command(self,command:str):
+
+    def update_machine_position(self,command:str):
+        if GCODE.ABSOLUTE_MODE in command:self.absolute=True
+        if GCODE.RELATIVE_MODE in command:self.absolute=False
+        if GCODE.LINEAR_MOVE_0 in command or GCODE.LINEAR_MOVE_1 in command:
+            if 'X' in command or 'Y' in command or 'Z' in command:
+                commands=command.split(' ')
+                x,y,z=None,None,None
+                for _command in commands[1:]:
+                    if 'X' in _command:x=float(_command[1:])
+                    if 'Y' in _command:y=float(_command[1:])
+                    if 'Z' in _command:z=float(_command[1:])
+                if self.absolute:
+                    self.x_pos=self.x_pos if x is None else x
+                    self.y_pos=self.y_pos if y is None else y
+                    self.z_pos=self.z_pos if z is None else z
+                else:
+                    self.x_pos=self.x_pos if x is None else self.x_pos+x
+                    self.y_pos=self.y_pos if y is None else self.y_pos+y
+                    self.z_pos=self.z_pos if z is None else self.z_pos+z
+
+    def wait_response(self,condition:bool,response,background:bool):
+        if condition:
+            line=self.connection.readline()
+            self.after(100,self.wait_response,line=='',line,background)
+        else:
+            self.process_response(True,response,background)
+
+    def process_response(self,condition,response,background:bool):
+        if condition:
+            if response!='' and not background:
+                if 'echo:' in response:self.console_log.write(response[5:])
+                else:self.console_log.write(response)
+            if 'X:' in response and 'Y:' in response and 'Z:' in response:
+                data=response.split(' ')
+                self.x_pos=float(data[0][2:])
+                self.y_pos=float(data[1][2:])
+                self.z_pos=float(data[2][2:])
+            if response=='ok':return
+            line=self.connection.readline()
+            self.after(50,self.process_response,line!='ok',line,background)
+        else:
+            if not background:self.console_log.write(response)
+
+    def pause(self):
+        self.active=False
+
+    def resume(self):
+        self.active=True
+
+    def clear_console(self):
+        self.console_log.clear()
+
+    def send_command(self,command:str,background=False):
         if self.connection.write(command):
-            self.read_from_serial()
+            self.update_machine_position(command)
+            self.wait_response(True,'',background)
         else:self.write_to_console('Connection error')
 
-    def write_to_console(self,msg:str):
-        self.console_log.config(state=NORMAL)
-        self.console_log.insert('end',msg+'\n')
-        self.console_log.config(state=DISABLED)
-
-
-    def read_from_serial(self):
-        data=self.connection.readlines()
-        self.console_log.config(state=NORMAL)
-        self.console_log.insert('end','[MACHINE]:\n')
-        self.console_log.config(state=DISABLED)
-        for line in data:
-            self.console_log.config(state=NORMAL)
-            self.console_log.insert('end',line.decode().strip('\r'))
-            self.console_log.config(state=DISABLED)
+    def write_to_console(self,msg:str,end='\n'):
+        self.console_log.write(msg,end=end)
 
     def process_command(self,command):
-        self.console_log.config(state=NORMAL)
-        self.console_log.insert('end','[HOST]: '+command+'\n')
-        self.console_log.config(state=DISABLED)
-        self.console_log.yview_moveto(1.0)
+        self.write_to_console('[HOST]: '+command)
         self.send_command(command)
+
+    def get_machine_pos(self):
+        return self.x_pos,self.y_pos,self.z_pos
+
+class Warning_Frame(Frame):
+
+    def __init__(self,container,warning_message='',**kwargs):
+        super().__init__(container,kwargs)
+        self.msg=warning_message
+        self.config(background="#1b1b1b")
+        self.msg_label=Label(self,text=self.msg,font=("Arial",16),bg="#1b1b1b",fg="white")
+        self.msg_label.place(x=(self.winfo_reqwidth()-self.msg_label.winfo_reqwidth())//2,y=50)
+        self.accept_btn=Button(self,text='Accept',font=("Arial",16),bg="#2c2c2c",fg="white",activebackground="#3d3d3d",
+                               activeforeground="white",bd=0,command=self.destroy)
+        self.accept_btn.place(x=(self.winfo_reqwidth()-self.accept_btn.winfo_reqwidth())//2,y=120)
+
+        self.grab_set()
+
+class Status_Bar(Frame):
+    
+    def __init__(self,container,**kwargs):
+        super().__init__(container,kwargs)
+        self.width=kwargs.get('width')
+        self.height=kwargs.get('height')
+        
+        self.status_text=Label(self,font=("Arial",10),anchor='w',borderwidth=2,relief='sunken')
+        self.status_text.place(x=2,y=2,width=self.width-4,height=self.height-4)
+
+    def set_text(self,text):
+        # self.status_text.write(text)
+        self.status_text.configure(text=text)
+
+class Manual_Control_Frame(Frame):
+    
+    def __init__(self,container,**kwargs):
+        super().__init__(container,kwargs)
+        self.width=kwargs.get('width')
+        self.height=kwargs.get('height')
+
+        self.serial_command_handler=None
+
+        self.acc_combobox=ttk.Combobox(self,state='readonly',values=['0.1','1.0','10.0','50.0'])
+        self.acc_combobox.current(2)
+        self.acc_combobox.place(x=10,y=10,height=25)
+
+        self.up_img=PhotoImage(Image.open("images/up_btn.png"))
+        self.down_img=PhotoImage(Image.open("images/down_btn.png"))
+        self.left_img=PhotoImage(Image.open("images/left_btn.png"))
+        self.right_img=PhotoImage(Image.open("images/right_btn.png"))
+
+
+        self.x_up_btn=Button(self,image=self.right_img,borderwidth=0,
+                             command=lambda command=f'G1 X':self.process_command(command))
+        self.x_down_btn=Button(self,image=self.left_img,borderwidth=0,
+                               command=lambda command=f'G1 X-':self.process_command(command))
+        self.x_down_btn.place(x=10,y=120,width=50,height=50)
+        self.x_up_btn.place(x=130,y=120,width=50,height=50)
+
+        self.y_up_btn=Button(self,image=self.up_img,borderwidth=0,
+                             command=lambda command=f'G1 Y':self.process_command(command))
+        self.y_down_btn=Button(self,image=self.down_img,borderwidth=0,
+                               command=lambda command=f'G1 Y-':self.process_command(command))
+        self.y_up_btn.place(x=70,y=65,width=50,height=50)
+        self.y_down_btn.place(x=70,y=175,width=50,height=50)
+
+        self.z_up_btn=Button(self,image=self.up_img,borderwidth=0,
+                             command=lambda command=f'G1 Z':self.process_command(command))
+        self.z_down_btn=Button(self,image=self.down_img,borderwidth=0,
+                               command=lambda command=f'G1 Z-':self.process_command(command))
+        self.z_up_btn.place(x=200,y=65,width=50,height=50)
+        self.z_down_btn.place(x=200,y=175,width=50,height=50)
+
+    def set_command_handler(self,command_handler):
+        self.serial_command_handler=command_handler
+
+    def process_command(self,command):
+        command=f'{command}{self.acc_combobox.get()}'
+        self.serial_command_handler('G91',background=True)
+        self.serial_command_handler(command,background=True)
+        self.serial_command_handler('G90',background=True)
+
+# class Settings_Frame(Frame):
+
+#     def __init__(self,container,settings:dict(),**kwargs):
+#         super().__init__(container,kwargs)
+#         self.settings=settings
+
+#         self.warning_frame=
+        

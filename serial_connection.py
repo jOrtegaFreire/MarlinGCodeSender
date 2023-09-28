@@ -45,6 +45,11 @@ class serial_port:
             line=line.decode().strip(self.end_char)
 
         return [line for line in data if line!='' and line!='>>> ']
+    
+    def readline(self):
+        data=self.conn.readline()
+        line=data.decode().strip(self.end_char)
+        return line
 
     def is_connected(self):
         return self.connected
